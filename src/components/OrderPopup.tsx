@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { X, ShieldCheck, CheckCircle2, ShoppingCart, Loader2, Info, MessageSquare } from "lucide-react";
+import { X, ShieldCheck, CheckCircle2, ShoppingCart, Loader2, Info, MessageSquare, Check } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { WatchProduct, STATES_AND_DISTRICTS } from "../data";
 
@@ -29,7 +29,7 @@ export default function OrderPopup({ product, singleQuantity, cartItems, isOpen,
   const [districts, setDistricts] = useState<string[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
+  const [isCancelled, setIsCancelled] = useState(false);
   const [checkoutUrl, setCheckoutUrl] = useState("");
 
   const totalPrice = cartItems && cartItems.length > 0
@@ -59,14 +59,10 @@ export default function OrderPopup({ product, singleQuantity, cartItems, isOpen,
       setLandmark("");
       setErrors({});
       setCheckoutUrl("");
-      setSubmittingState(false);
+      setIsSubmitting(false);
+      setIsCancelled(false);
     }
   }, [isOpen]);
-
-  const setSubmittingState = (loading: boolean) => {
-    setIsSubmitting(loading);
-    setIsSuccess(!loading && isSuccess);
-  };
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -124,23 +120,19 @@ export default function OrderPopup({ product, singleQuantity, cartItems, isOpen,
 
     setIsSubmitting(true);
 
-    setTimeout(() => {
-      setIsSubmitting(false);
-      setIsSuccess(true);
+    const landmarkText = landmark.trim() ? landmark.trim() : "None Provided";
 
-      const landmarkText = landmark.trim() ? landmark.trim() : "None Provided";
+    let orderDetailsText = "";
+    if (cartItems && cartItems.length > 0) {
+      orderDetailsText = cartItems
+        .map((item) => `- ${item.product.name} (Qty: ${item.quantity}) - ₹${item.product.price * item.quantity}`)
+        .join("\n");
+    } else if (product) {
+      const orderQty = singleQuantity || 1;
+      orderDetailsText = `- ${product.name} (Qty: ${orderQty}) - ₹${product.price * orderQty}`;
+    }
 
-      let orderDetailsText = "";
-      if (cartItems && cartItems.length > 0) {
-        orderDetailsText = cartItems
-          .map((item) => `- ${item.product.name} (Qty: ${item.quantity}) - ₹${item.product.price * item.quantity}`)
-          .join("\n");
-      } else if (product) {
-        const orderQty = singleQuantity || 1;
-        orderDetailsText = `- ${product.name} (Qty: ${orderQty}) - ₹${product.price * orderQty}`;
-      }
-
-      const message = `Hello Smart Store,
+    const message = `Hello Smart Store,
 
 I would like to place an order.
 
@@ -169,10 +161,26 @@ Payment Method: Cash on Delivery (COD)
 
 Please confirm my order.`;
 
-      const encodedMessage = encodeURIComponent(message);
-      const whatsappUrl = `https://wa.me/917012700636?text=${encodedMessage}`;
-      setCheckoutUrl(whatsappUrl);
-    }, 400);
+    const encodedMessage = encodeURIComponent(message);
+    const whatsappUrl = `https://wa.me/917012700636?text=${encodedMessage}`;
+    setCheckoutUrl(whatsappUrl);
+
+    // Directly open WhatsApp channel
+    try {
+      window.open(whatsappUrl, "_blank");
+    } catch (err) {
+      console.error("Popup window redirect blocked:", err);
+      // Fallback redirect
+      window.location.href = whatsappUrl;
+    }
+
+    setIsSubmitting(false);
+
+    // Automatically complete order and close checkout popup
+    if (onOrderSuccess) {
+      onOrderSuccess();
+    }
+    onClose();
   };
 
   return (
@@ -194,153 +202,66 @@ Please confirm my order.`;
             transition={{ duration: 0.3 }}
             className="relative bg-white rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl border border-stone-100 z-10 flex flex-col max-h-[90vh]"
           >
-            {isSuccess ? (
-              <div className="p-8 text-center flex flex-col items-center justify-center space-y-6 my-12 relative overflow-hidden">
-                {/* Visual Confetti Blast */}
-                <div className="absolute inset-0 pointer-events-none overflow-hidden">
-                  {Array.from({ length: 30 }).map((_, i) => {
-                    const angle = (i / 30) * 360 + (i * 17) % 15 - 7.5;
-                    const delay = (i % 5) * 0.08;
-                    const distance = 95 + ((i * 23) % 110);
-                    const rad = (angle * Math.PI) / 180;
-                    const tx = Math.cos(rad) * distance;
-                    const ty = Math.sin(rad) * distance;
-                    const colors = ["#10b981", "#3b82f6", "#f59e0b", "#ec4899", "#8b5cf6", "#10b981", "#fbbf24"];
-                    const color = colors[i % colors.length];
-                    const size = 6 + (i % 6);
-                    const shape = i % 3 === 0 ? "rounded-full" : i % 3 === 1 ? "rotate-45" : "rounded-sm";
-
-                    return (
-                      <motion.div
-                        key={i}
-                        initial={{ x: 0, y: 0, scale: 0, opacity: 1, rotate: 0 }}
-                        animate={{
-                          x: tx,
-                          y: ty,
-                          scale: [0, 1, 0.8, 0],
-                          opacity: [1, 1, 0.4, 0],
-                          rotate: [0, 360 + (i * 30)],
-                        }}
-                        transition={{
-                          duration: 1.6 + (i % 3) * 0.4,
-                          ease: "easeOut",
-                          delay: delay,
-                        }}
-                        className={`absolute left-1/2 top-1/2 -ml-1 -mt-1 ${shape}`}
-                        style={{
-                          width: size,
-                          height: size,
-                          backgroundColor: color,
-                        }}
-                      />
-                    );
-                  })}
-                </div>
-
-                {/* Animated Glowing Ring Backdrop */}
+            {isCancelled ? (
+              <div className="p-8 text-center flex flex-col items-center justify-center space-y-6 my-12 relative overflow-hidden animate-fade-in">
+                {/* Cancel visual icon */}
                 <div className="relative flex items-center justify-center">
                   <motion.div
                     initial={{ scale: 0.8, opacity: 0 }}
-                    animate={{ scale: [1, 1.4, 1.6], opacity: [0.6, 0.2, 0] }}
+                    animate={{ scale: [1, 1.25, 1.4], opacity: [0.6, 0.2, 0] }}
                     transition={{ duration: 1.5, repeat: Infinity, ease: "easeOut" }}
-                    className="absolute w-24 h-24 rounded-full bg-emerald-100 border border-emerald-400"
+                    className="absolute w-24 h-24 rounded-full bg-rose-100 border border-rose-400"
                   />
-                  <motion.div
-                    initial={{ scale: 0.8, opacity: 0 }}
-                    animate={{ scale: [1, 1.25, 1.4], opacity: [0.5, 0.1, 0] }}
-                    transition={{ duration: 1.5, delay: 0.5, repeat: Infinity, ease: "easeOut" }}
-                    className="absolute w-24 h-24 rounded-full bg-emerald-50 border border-emerald-300"
-                  />
-
-                  {/* Big Custom Animated Green Seal Circle */}
                   <motion.div
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
                     transition={{ type: "spring", stiffness: 220, damping: 15 }}
-                    className="relative w-20 h-20 bg-emerald-500 rounded-full flex items-center justify-center shadow-lg border-2 border-white"
+                    className="relative w-20 h-20 bg-rose-500 rounded-full flex items-center justify-center shadow-lg border-2 border-white"
                   >
-                    {/* Animated Checkmark Draw */}
-                    <svg
-                      className="w-10 h-10 text-white"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={3.5}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <motion.path
-                        initial={{ pathLength: 0 }}
-                        animate={{ pathLength: 1 }}
-                        transition={{ duration: 0.6, ease: "easeOut", delay: 0.15 }}
-                        d="M5 13l4 4L19 7"
-                      />
-                    </svg>
+                    <X className="w-10 h-10 text-white" />
                   </motion.div>
                 </div>
 
-                {/* Celebration Sparkles/Stars */}
                 <div className="space-y-2 mt-4 z-10">
                   <motion.h3 
                     initial={{ opacity: 0, y: 15 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.3, duration: 0.4 }}
-                    className="font-display text-2xl font-black text-[#0f3629] tracking-tight"
+                    transition={{ delay: 0.2, duration: 0.4 }}
+                    className="font-display text-2xl font-black text-rose-950 tracking-tight"
                   >
-                    Order Placed Successfully!
+                    You ordered cancel
                   </motion.h3>
                   
                   <motion.p 
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.5, duration: 0.4 }}
+                    transition={{ delay: 0.4, duration: 0.4 }}
                     className="text-stone-500 text-sm max-w-sm font-light leading-relaxed px-4"
                   >
-                    Thank you! Your order is registered perfectly. To complete dispatch confirmation, please click the button below to message us on WhatsApp.
+                    Your order checkout has been cancelled. You can go back to complete your order or choose another stylish timepiece!
                   </motion.p>
                 </div>
 
-               <motion.div 
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.7 }}
-                  className="flex flex-col items-center gap-3 w-full max-w-xs z-10"
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 0.5 }}
+                  className="flex gap-3 w-full max-w-xs z-10 mt-2"
                 >
-                  {checkoutUrl && (
-                    <div className="w-full flex flex-col items-center gap-2.5">
-                      <a
-                        href={checkoutUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={() => {
-                          // Let the standard click event open the new tab/app, then close the modal
-                          setTimeout(() => {
-                            if (onOrderSuccess) {
-                              onOrderSuccess();
-                            }
-                            onClose();
-                          }, 1000);
-                        }}
-                        className="inline-flex items-center justify-center gap-2 px-5 py-4 bg-[#25D366] hover:bg-[#20ba59] active:scale-95 text-white font-extrabold text-[12px] uppercase tracking-wider rounded-xl shadow-md hover:shadow-lg transition-all cursor-pointer w-full text-center"
-                      >
-                        <MessageSquare className="w-4 h-4 fill-white stroke-none animate-pulse" />
-                        <span>Send WhatsApp order message</span>
-                      </a>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (onOrderSuccess) {
-                            onOrderSuccess();
-                          }
-                          onClose();
-                        }}
-                        className="text-stone-400 hover:text-stone-600 text-[11px] font-semibold py-1 focus:outline-none transition underline decoration-dotted capitalize cursor-pointer mt-1"
-                      >
-                        Close & Return to Store
-                      </button>
-                    </div>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => setIsCancelled(false)}
+                    className="w-1/2 bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold py-3.5 rounded-xl border border-stone-200 transition active:scale-95 cursor-pointer"
+                  >
+                    Go Back
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="w-1/2 bg-rose-600 hover:bg-rose-750 text-white text-xs font-bold py-3.5 rounded-xl transition active:scale-95 cursor-pointer"
+                  >
+                    Close
+                  </button>
                 </motion.div>
               </div>
             ) : (
@@ -530,23 +451,26 @@ Please confirm my order.`;
                   <div className="pt-4 border-t border-stone-100 flex items-center gap-3">
                     <button
                       type="button"
-                      onClick={onClose}
-                      className="w-1/3 bg-stone-50 hover:bg-stone-100 text-stone-700 text-sm font-semibold py-3 rounded-xl border border-stone-200/60 active:scale-95 transition"
+                      onClick={() => setIsCancelled(true)}
+                      className="w-1/3 bg-stone-50 hover:bg-stone-100 text-stone-750 text-sm font-semibold py-3 rounded-xl border border-stone-200/60 active:scale-95 transition cursor-pointer"
                     >
                       Cancel
                     </button>
                     <button
                       type="submit"
                       disabled={isSubmitting}
-                      className="w-2/3 bg-forest-800 hover:bg-forest-700 text-white text-sm font-bold py-3 rounded-xl active:scale-95 transition shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:bg-stone-300"
+                      className="w-2/3 bg-[#25D366] hover:bg-[#20ba59] text-white text-sm font-bold py-3 rounded-xl active:scale-95 transition shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:bg-stone-300"
                     >
                       {isSubmitting ? (
                         <>
                           <Loader2 className="w-4 h-4 animate-spin" />
-                          <span>Verifying Delivery...</span>
+                          <span>Connecting WhatsApp...</span>
                         </>
                       ) : (
-                        <span>Place Cash on Delivery Order</span>
+                        <>
+                          <MessageSquare className="w-4 h-4 fill-white stroke-none" />
+                          <span>Confirm to WhatsApp</span>
+                        </>
                       )}
                     </button>
                   </div>
