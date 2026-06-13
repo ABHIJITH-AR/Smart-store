@@ -6,32 +6,22 @@ import { WatchProduct } from "../data";
 interface WatchCardProps {
   key?: string;
   product: WatchProduct;
+  isLiked: boolean;
+  onLikeToggle: (productId: string, e: React.MouseEvent) => void;
   onSelect: (productId: string) => void;
   onAddToCartClick: (product: WatchProduct, e: any) => void;
   onBuyNowClick: (productId: string, e: any) => void;
 }
 
-export default function WatchCard({ product, onSelect, onAddToCartClick, onBuyNowClick }: WatchCardProps) {
+export default function WatchCard({
+  product,
+  isLiked,
+  onLikeToggle,
+  onSelect,
+  onAddToCartClick,
+  onBuyNowClick,
+}: WatchCardProps) {
   const originalPrice = product.price + 800;
-  
-  const [isLiked, setIsLiked] = React.useState(() => {
-    try {
-      return localStorage.getItem(`liked-${product.id}`) === "true";
-    } catch {
-      return false;
-    }
-  });
-
-  const handleLikeClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    const nextLiked = !isLiked;
-    setIsLiked(nextLiked);
-    try {
-      localStorage.setItem(`liked-${product.id}`, String(nextLiked));
-    } catch (err) {
-      console.error(err);
-    }
-  };
 
   return (
     <motion.div
@@ -60,7 +50,7 @@ export default function WatchCard({ product, onSelect, onAddToCartClick, onBuyNo
         />
         
         <button
-          onClick={handleLikeClick}
+          onClick={(e) => onLikeToggle(product.id, e)}
           className="absolute bottom-3 right-3 z-10 w-8.5 h-8.5 rounded-full bg-white border border-stone-150 flex items-center justify-center shadow-xs active:scale-90 hover:scale-105 transition cursor-pointer"
           title={isLiked ? "Unlike product" : "Like product"}
         >

@@ -13,6 +13,7 @@ import AboutPage from "./components/AboutPage";
 import ContactPage from "./components/ContactPage";
 import PolicyPage from "./components/PolicyPage";
 import CartSidebar from "./components/CartSidebar";
+import FavoritesSidebar from "./components/FavoritesSidebar";
 
 interface CartItem {
   product: WatchProduct;
@@ -42,6 +43,23 @@ export default function App() {
   });
   const [isCartOpen, setIsCartOpen] = useState(false);
 
+  const [favorites, setFavorites] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem("smart_store_favorites");
+      if (saved) return JSON.parse(saved);
+      const initial: string[] = [];
+      WATCHES.forEach((watch) => {
+        if (localStorage.getItem(`liked-${watch.id}`) === "true") {
+          initial.push(watch.id);
+        }
+      });
+      return initial;
+    } catch {
+      return [];
+    }
+  });
+  const [isFavoritesOpen, setIsFavoritesOpen] = useState(false);
+
   useEffect(() => {
     try {
       localStorage.setItem("smart_store_cart", JSON.stringify(cart));
@@ -49,6 +67,30 @@ export default function App() {
       // ignore
     }
   }, [cart]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("smart_store_favorites", JSON.stringify(favorites));
+    } catch {
+      // ignore
+    }
+  }, [favorites]);
+
+  const handleToggleFavorite = (productId: string, e?: any) => {
+    if (e) e.stopPropagation();
+    setFavorites((prev) => {
+      const exists = prev.includes(productId);
+      const nextFavorites = exists
+        ? prev.filter((id) => id !== productId)
+        : [...prev, productId];
+      try {
+        localStorage.setItem(`liked-${productId}`, String(!exists));
+      } catch {
+        // ignore
+      }
+      return nextFavorites;
+    });
+  };
 
   const collectionRef = useRef<HTMLDivElement>(null);
 
@@ -145,6 +187,8 @@ export default function App() {
           return (
             <ProductDetails
               product={activeProduct}
+              isLiked={favorites.includes(activeProduct.id)}
+              onLikeToggle={() => handleToggleFavorite(activeProduct.id)}
               onBack={() => setCurrentView("home")}
               onBuyNow={handleBuyNow}
               onAddToCart={(product, quantity) => handleAddToCart(product, null, quantity)}
@@ -229,6 +273,8 @@ export default function App() {
                 <WatchCard
                   key={watch.id}
                   product={watch}
+                  isLiked={favorites.includes(watch.id)}
+                  onLikeToggle={handleToggleFavorite}
                   onSelect={handleSelectProduct}
                   onAddToCartClick={handleAddToCart}
                   onBuyNowClick={handleBuyNowFromGrid}
@@ -335,6 +381,8 @@ export default function App() {
         onSearchFocus={handleSearchFocus}
         cartCount={cart.reduce((acc, item) => acc + item.quantity, 0)}
         onCartClick={() => setIsCartOpen(true)}
+        favoritesCount={favorites.length}
+        onFavoritesClick={() => setIsFavoritesOpen(true)}
       />
 
       <main className="flex-1">
@@ -369,6 +417,15 @@ export default function App() {
         onUpdateQuantity={handleUpdateCartQuantity}
         onRemoveItem={handleRemoveCartItem}
         onCheckout={handleCheckoutCart}
+        onExploreClick={handleShopNowClick}
+      />
+
+      <FavoritesSidebar
+        isOpen={isFavoritesOpen}
+        onClose={() => setIsFavoritesOpen(false)}
+        favoriteItems={WATCHES.filter((w) => favorites.includes(w.id))}
+        onRemoveFavorite={(productId) => handleToggleFavorite(productId)}
+        onAddToCart={(product, e) => handleAddToCart(product, e, 1)}
         onExploreClick={handleShopNowClick}
       />
     </div>

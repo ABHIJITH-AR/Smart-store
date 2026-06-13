@@ -33,34 +33,25 @@ const PRODUCT_COLORS: Record<string, { name: string; hexs: string[]; description
 
 interface ProductDetailsProps {
   product: WatchProduct;
+  isLiked: boolean;
+  onLikeToggle: () => void;
   onBack: () => void;
   onBuyNow: (productId: string, quantity: number) => void;
   onAddToCart: (product: WatchProduct, quantity: number) => void;
 }
 
-export default function ProductDetails({ product, onBack, onBuyNow, onAddToCart }: ProductDetailsProps) {
+export default function ProductDetails({
+  product,
+  isLiked,
+  onLikeToggle,
+  onBack,
+  onBuyNow,
+  onAddToCart,
+}: ProductDetailsProps) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [direction, setDirection] = useState(0); // -1 for left/prev, 1 for right/next
   const [qty, setQty] = useState(1);
   const originalPrice = product.price + 800;
-
-  const [isLiked, setIsLiked] = useState(() => {
-    try {
-      return localStorage.getItem(`liked-${product.id}`) === "true";
-    } catch {
-      return false;
-    }
-  });
-
-  const handleLikeToggle = () => {
-    const nextLiked = !isLiked;
-    setIsLiked(nextLiked);
-    try {
-      localStorage.setItem(`liked-${product.id}`, String(nextLiked));
-    } catch (err) {
-      console.error(err);
-    }
-  };
 
   // Comments states
   const [comments, setComments] = useState<Array<{ name: string; comment: string; rating: number; date: string; verified: boolean }>>([]);
@@ -229,7 +220,7 @@ export default function ProductDetails({ product, onBack, onBuyNow, onAddToCart 
 
               {/* Heart Wishlist Like Button */}
               <button
-                onClick={handleLikeToggle}
+                onClick={onLikeToggle}
                 className="absolute bottom-4 right-4 z-10 w-10 h-10 rounded-full bg-white border border-stone-200 shadow-sm flex items-center justify-center cursor-pointer transition hover:scale-105 active:scale-90"
                 title={isLiked ? "Unlike product" : "Like product"}
               >
